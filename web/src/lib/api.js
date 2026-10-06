@@ -154,13 +154,24 @@ async function recompileClientTargets(clientId, onProgress) {
   });
 
   const targetPath = `${clientId}/targets.mind`;
+
+  // Временная диагностика: проверяем сессию ПРЯМО перед отправкой файла,
+  // без паузы — чтобы понять, не "протухает" ли вход за время компиляции.
+  const { data: sessionCheck } = await supabase.auth.getSession();
+  const { data: whoamiCheck, error: whoamiErr } = await supabase.rpc("whoami");
+
   const { error: uploadErr } = await supabase.storage
     .from(BUCKETS.targets)
     .upload(targetPath, new Blob([buffer]), { upsert: true, contentType: "application/octet-stream" });
   if (uploadErr) {
     // Временно выводим подробности ошибки целиком — .message иногда
-    // обрезает важные детали (код ошибки, statusCode и т.д.).
-    throw new Error("Не удалось загрузить .mind файл: " + JSON.stringify(uploadErr));
+    // обрезает важные детали (код ошибки, statusCode и т.д.), плюс
+    // состояние сессии/прав прямо перед этим запросом.
+    throw new Error(
+      "Не удалось загрузить .mind файл: " + JSON.stringify(uploadErr) +
+      " | сессия есть: " + !!sessionCheck?.session +
+      " | whoami: " + JSON.stringify(whoamiCheck) + " / ошибка whoami: " + (whoamiErr?.message || "нет")
+    );
   }
 
   const pairOrder = pairs.map((p) => p.id);
