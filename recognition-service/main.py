@@ -149,6 +149,18 @@ async def upload_pair(
     return {"pair_id": pair_id}
 
 
+@app.delete("/admin/pairs/{pair_id}")
+def delete_pair(pair_id: str, authorization: str | None = Header(None)):
+    require_admin(authorization)
+    row = supabase.table("pairs").select("photo_path, video_path").eq("id", pair_id).single().execute()
+    if not row.data:
+        raise HTTPException(404, "Пара не найдена")
+    supabase.storage.from_("photos").remove([row.data["photo_path"]])
+    supabase.storage.from_("videos").remove([row.data["video_path"]])
+    supabase.table("pairs").delete().eq("id", pair_id).execute()
+    return {"deleted": pair_id}
+
+
 @app.get("/admin/pairs")
 def list_all_pairs(authorization: str | None = Header(None)):
     require_admin(authorization)
