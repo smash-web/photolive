@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listAllPairsAdmin, uploadPairAdmin, createClientAdmin } from "../lib/api";
+import { listAllPairsAdmin, uploadPairAdmin, createClientAdmin, deletePairAdmin } from "../lib/api";
 
 export default function AdminPage() {
   const [pairs, setPairs] = useState([]);
@@ -13,6 +13,16 @@ export default function AdminPage() {
 
   const refresh = () => listAllPairsAdmin().then(setPairs).catch(() => {});
   useEffect(() => { refresh(); }, []);
+
+  const handleDelete = async (pairId) => {
+    if (!window.confirm("Удалить эту пару фото+видео безвозвратно?")) return;
+    try {
+      await deletePairAdmin(pairId);
+      refresh();
+    } catch (err) {
+      alert("Ошибка удаления: " + err.message);
+    }
+  };
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -83,6 +93,9 @@ export default function AdminPage() {
               <p style={{ fontSize: 10, color: "#888", wordBreak: "break-all" }}>
                 {p.client_id ? <span style={{ userSelect: "all" }}>{p.client_id}</span> : "не привязано"}
               </p>
+              <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, color: "red" }}>
+                Удалить
+              </button>
             </div>
           ))}
         </div>
