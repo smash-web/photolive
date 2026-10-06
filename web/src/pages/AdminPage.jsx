@@ -8,7 +8,7 @@ export default function AdminPage() {
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
   const [newClientName, setNewClientName] = useState("");
-  const [lastLink, setLastLink] = useState(null);
+  const [lastClient, setLastClient] = useState(null);
   const [status, setStatus] = useState(null);
 
   const refresh = () => listAllPairsAdmin().then(setPairs).catch(() => {});
@@ -32,7 +32,11 @@ export default function AdminPage() {
   const handleCreateClient = async (e) => {
     e.preventDefault();
     const res = await createClientAdmin(newClientName);
-    setLastLink(`${window.location.origin}${res.gallery_link}`);
+    setLastClient({
+      id: res.client_id,
+      link: `${window.location.origin}${res.gallery_link}`,
+    });
+    setClientId(res.client_id);
     setNewClientName("");
   };
 
@@ -44,10 +48,16 @@ export default function AdminPage() {
           <input placeholder="Имя клиента" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
           <button type="submit">Сгенерировать ссылку</button>
         </form>
-        {lastLink && (
-          <p>
-            Ссылка для клиента: <a href={lastLink}>{lastLink}</a>
-          </p>
+        {lastClient && (
+          <div style={{ marginTop: 8, fontSize: 13 }}>
+            <p>
+              Ссылка для клиента: <a href={lastClient.link}>{lastClient.link}</a>
+            </p>
+            <p>
+              ID клиента (уже подставлен в поле "ID клиента" ниже):<br />
+              <code style={{ userSelect: "all", background: "#f0f0f0", padding: 4 }}>{lastClient.id}</code>
+            </p>
+          </div>
         )}
       </section>
 
@@ -70,7 +80,9 @@ export default function AdminPage() {
             <div key={p.id} style={{ width: 140 }}>
               <img src={p.photo_url} alt={p.title} style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 8 }} />
               <p style={{ fontSize: 12 }}>{p.title || "(без названия)"}</p>
-              <p style={{ fontSize: 11, color: "#888" }}>{p.client_id ? `клиент: ${p.client_id.slice(0, 8)}…` : "не привязано"}</p>
+              <p style={{ fontSize: 10, color: "#888", wordBreak: "break-all" }}>
+                {p.client_id ? <span style={{ userSelect: "all" }}>{p.client_id}</span> : "не привязано"}
+              </p>
             </div>
           ))}
         </div>
