@@ -156,6 +156,16 @@ async function recompileClientTargets(clientId, onProgress) {
     if (onProgress) onProgress(`Компилируем AR-цели: ${Math.round(progress)}%`);
   });
 
+  // ВРЕМЕННАЯ диагностика: что реально вернул компилятор?
+  if (onProgress) {
+    onProgress(
+      `[диагностика] тип: ${Object.prototype.toString.call(buffer)}, ` +
+      `byteLength: ${buffer?.byteLength ?? "нет"}, ` +
+      `конструктор: ${buffer?.constructor?.name ?? "нет"}`
+    );
+    await new Promise((r) => setTimeout(r, 4000)); // чтобы успеть прочитать статус
+  }
+
   const targetPath = `${clientId}/targets.mind`;
 
   // Временная диагностика: проверяем сессию ПРЯМО перед отправкой файла,
