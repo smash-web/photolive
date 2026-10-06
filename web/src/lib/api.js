@@ -3,10 +3,7 @@
 import { supabase } from "../supabaseClient";
 import { compileTargets } from "./mindCompiler";
 
-// ВРЕМЕННЫЙ ТЕСТ: направляем .mind файлы в уже рабочий бакет photos
-// вместо targets, чтобы понять, проблема в конкретном бакете targets
-// или где-то ещё. Вернём обратно после диагностики.
-const BUCKETS = { photos: "photos", videos: "videos", targets: "photos" };
+const BUCKETS = { photos: "photos", videos: "videos", targets: "targets" };
 
 function publicUrl(bucket, path) {
   if (!path) return null;
@@ -156,34 +153,18 @@ async function recompileClientTargets(clientId, onProgress) {
     if (onProgress) onProgress(`Компилируем AR-цели: ${Math.round(progress)}%`);
   });
 
-  const bufferDiag =
-    `тип: ${Object.prototype.toString.call(buffer)}, ` +
-    `byteLength: ${buffer?.byteLength ?? "нет"}, ` +
-    `конструктор: ${buffer?.constructor?.name ?? "нет"}`;
-
   const targetPath = `${clientId}/targets.mind`;
 
-  // Временная диагностика: проверяем сессию ПРЯМО перед отправкой файла,
-  // без паузы — чтобы понять, не "протухает" ли вход за время компиляции.
-  const { data: sessionCheck } = await supabase.auth.getSession();
-  const { data: whoamiCheck, error: whoamiErr } = await supabase.rpc("whoami");
+  // Загружаем .mind файл заново: сначала удаляем старый (если есть),
+  // затем простой upload без upsert — именно upsert вызывал 403 при
+  // проверке существования файла.
+  await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
 
-  // ВРЕМЕННО: убрали upsert и contentType, и путь теперь каждый раз
-  // новый (со случайным суффиксом) — проверяем, не в upsert ли дело.
-  const testPath = `${targetPath}.test-${Date.now()}`;
   const { error: uploadErr } = await supabase.storage
     .from(BUCKETS.targets)
-    .upload(testPath, new Blob([buffer]));
+    .upload(targetPath, new Blob([buffer]), { contentType: "application/octet-stream" });
   if (uploadErr) {
-    // Временно выводим подробности ошибки целиком — .message иногда
-    // обрезает важные детали (код ошибки, statusCode и т.д.), плюс
-    // состояние сессии/прав прямо перед этим запросом.
-    throw new Error(
-      "Не удалось загрузить .mind файл: " + JSON.stringify(uploadErr) +
-      " | сессия есть: " + !!sessionCheck?.session +
-      " | whoami: " + JSON.stringify(whoamiCheck) + " / ошибка whoami: " + (whoamiErr?.message || "нет") +
-      " | буфер: " + bufferDiag
-    );
+    throw new Error("Не удалось загрузить .mind файл: " + uploadErr.message);
   }
 
   const pairOrder = pairs.map((p) => p.id);
