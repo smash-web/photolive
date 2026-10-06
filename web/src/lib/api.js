@@ -60,6 +60,15 @@ export async function uploadPairAdmin({ photoFile, videoFile, clientId, title })
   return res.json();
 }
 
+export async function deletePairAdmin(pairId) {
+  const res = await fetch(`${API_BASE}/admin/pairs/${pairId}`, {
+    method: "DELETE",
+    headers: await authHeader(),
+  });
+  if (!res.ok) throw new Error("Не удалось удалить");
+  return res.json();
+}
+
 export async function recognizeFrame({ blob, token }) {
   const form = new FormData();
   form.append("frame", blob, "frame.jpg");
