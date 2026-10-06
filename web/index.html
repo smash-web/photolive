@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>PhotoLive</title>
+
+    <!--
+      ВАЖНО: three и mind-ar подключены здесь через CDN (importmap),
+      а НЕ через npm install. Причина: пакет mind-ar тянет зависимость
+      "canvas" (нативные C++ биндинги для Node), которая не собирается
+      на сервере Vercel — именно из-за этого был build error. Через
+      importmap эти библиотеки грузятся прямо в браузере, Node/Vercel
+      их вообще не видит при сборке.
+
+      Версия three ЗАФИКСИРОВАНА на 0.137.0 (а не на самой новой) —
+      mind-ar внутри использует устаревшее имя THREE.sRGBEncoding,
+      которое более новые версии three.js (0.152+) удалили. С более
+      новым three страница выдаст ошибку импорта в консоли браузера.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.137.0/build/three.module.js",
+          "mind-ar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js",
+          "mind-ar-image": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
