@@ -157,7 +157,11 @@ async function recompileClientTargets(clientId, onProgress) {
   const { error: uploadErr } = await supabase.storage
     .from(BUCKETS.targets)
     .upload(targetPath, new Blob([buffer]), { upsert: true, contentType: "application/octet-stream" });
-  if (uploadErr) throw new Error("Не удалось загрузить .mind файл: " + uploadErr.message);
+  if (uploadErr) {
+    // Временно выводим подробности ошибки целиком — .message иногда
+    // обрезает важные детали (код ошибки, statusCode и т.д.).
+    throw new Error("Не удалось загрузить .mind файл: " + JSON.stringify(uploadErr));
+  }
 
   const pairOrder = pairs.map((p) => p.id);
   const { error: upsertErr } = await supabase
