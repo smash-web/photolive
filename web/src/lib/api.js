@@ -156,15 +156,10 @@ async function recompileClientTargets(clientId, onProgress) {
     if (onProgress) onProgress(`Компилируем AR-цели: ${Math.round(progress)}%`);
   });
 
-  // ВРЕМЕННАЯ диагностика: что реально вернул компилятор?
-  if (onProgress) {
-    onProgress(
-      `[диагностика] тип: ${Object.prototype.toString.call(buffer)}, ` +
-      `byteLength: ${buffer?.byteLength ?? "нет"}, ` +
-      `конструктор: ${buffer?.constructor?.name ?? "нет"}`
-    );
-    await new Promise((r) => setTimeout(r, 4000)); // чтобы успеть прочитать статус
-  }
+  const bufferDiag =
+    `тип: ${Object.prototype.toString.call(buffer)}, ` +
+    `byteLength: ${buffer?.byteLength ?? "нет"}, ` +
+    `конструктор: ${buffer?.constructor?.name ?? "нет"}`;
 
   const targetPath = `${clientId}/targets.mind`;
 
@@ -173,9 +168,12 @@ async function recompileClientTargets(clientId, onProgress) {
   const { data: sessionCheck } = await supabase.auth.getSession();
   const { data: whoamiCheck, error: whoamiErr } = await supabase.rpc("whoami");
 
+  // ВРЕМЕННО: убрали upsert и contentType, и путь теперь каждый раз
+  // новый (со случайным суффиксом) — проверяем, не в upsert ли дело.
+  const testPath = `${targetPath}.test-${Date.now()}`;
   const { error: uploadErr } = await supabase.storage
     .from(BUCKETS.targets)
-    .upload(targetPath, new Blob([buffer]), { upsert: true, contentType: "application/octet-stream" });
+    .upload(testPath, new Blob([buffer]));
   if (uploadErr) {
     // Временно выводим подробности ошибки целиком — .message иногда
     // обрезает важные детали (код ошибки, statusCode и т.д.), плюс
@@ -183,7 +181,8 @@ async function recompileClientTargets(clientId, onProgress) {
     throw new Error(
       "Не удалось загрузить .mind файл: " + JSON.stringify(uploadErr) +
       " | сессия есть: " + !!sessionCheck?.session +
-      " | whoami: " + JSON.stringify(whoamiCheck) + " / ошибка whoami: " + (whoamiErr?.message || "нет")
+      " | whoami: " + JSON.stringify(whoamiCheck) + " / ошибка whoami: " + (whoamiErr?.message || "нет") +
+      " | буфер: " + bufferDiag
     );
   }
 
