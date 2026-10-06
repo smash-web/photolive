@@ -1,10 +1,24 @@
 import { useEffect, useState } from "react";
 import { listAllPairsAdmin, createClientAdmin, uploadPairAdmin, deletePairAdmin } from "../lib/api";
+import { supabase } from "../supabaseClient";
 
 export default function AdminPage() {
   const [pairs, setPairs] = useState([]);
   const [status, setStatus] = useState("");
   const [error, setError] = useState(null);
+  const [whoami, setWhoami] = useState(null);
+
+  // ВРЕМЕННАЯ диагностика: показывает, что база данных видит про текущую
+  // сессию (ваш auth id, роль, и результат проверки is_admin()). Уберём
+  // после того, как разберёмся с ошибкой доступа к бакету targets.
+  const checkAccess = async () => {
+    const { data, error } = await supabase.rpc("whoami");
+    if (error) {
+      setWhoami("Ошибка проверки: " + error.message);
+    } else {
+      setWhoami(JSON.stringify(data));
+    }
+  };
 
   const [photoFile, setPhotoFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
@@ -81,6 +95,11 @@ export default function AdminPage() {
     <div style={{ padding: 24, maxWidth: 720 }}>
       <h2>Админ-панель</h2>
       {error && <p style={{ color: "red" }}>{error}</p>}
+
+      <section style={{ marginBottom: 24, padding: 12, border: "1px dashed #999", borderRadius: 8 }}>
+        <button onClick={checkAccess}>Проверить права доступа (диагностика)</button>
+        {whoami && <p style={{ fontSize: 13, wordBreak: "break-all" }}>{whoami}</p>}
+      </section>
 
       <section style={{ marginBottom: 24, padding: 16, border: "1px solid #eee", borderRadius: 8 }}>
         <h3>Создать клиента</h3>
