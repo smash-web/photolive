@@ -9,6 +9,8 @@ export default function ScanPage() {
   const [matchedVideo, setMatchedVideo] = useState(null);
   const [scanning, setScanning] = useState(true);
   const [error, setError] = useState(null);
+  const [debug, setDebug] = useState("Ещё не пробовал");
+  const attempts = useRef(0);
 
   useEffect(() => {
     navigator.mediaDevices
@@ -29,13 +31,19 @@ export default function ScanPage() {
       canvas.getContext("2d").drawImage(video, 0, 0);
       canvas.toBlob(async (blob) => {
         if (!blob) return;
+        attempts.current += 1;
         try {
           const res = await recognizeFrame({ blob, token });
           if (res.match) {
             setMatchedVideo(res.match.video_url);
             setScanning(false);
+            setDebug("Найдено совпадение!");
+          } else {
+            setDebug(`Попытка №${attempts.current}: сервер ответил, совпадений не найдено`);
           }
-        } catch (e) {}
+        } catch (e) {
+          setDebug(`Попытка №${attempts.current}: ОШИБКА — ${e.message}`);
+        }
       }, "image/jpeg", 0.85);
     }, 1500);
     return () => clearInterval(interval);
@@ -49,9 +57,10 @@ export default function ScanPage() {
       <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       <canvas ref={canvasRef} style={{ display: "none" }} />
       {scanning && !matchedVideo && (
-        <p style={{ position: "absolute", bottom: 24, left: 0, right: 0, textAlign: "center", color: "#fff" }}>
-          Наведите камеру на фото...
-        </p>
+        <div style={{ position: "absolute", bottom: 24, left: 0, right: 0, textAlign: "center", color: "#fff" }}>
+          <p>Наведите камеру на фото...</p>
+          <p style={{ fontSize: 11, color: "#aaa", padding: "0 12px" }}>{debug}</p>
+        </div>
       )}
       {matchedVideo && (
         <div style={{ position: "absolute", inset: 0, background: "#000" }}>
