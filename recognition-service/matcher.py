@@ -1,22 +1,34 @@
 """
 Распознавание распечатанного фото по кадру с камеры.
 
-Почему не perceptual hash (pHash): pHash сравнивает фото "в целом" и
-ломается от угла съёмки, обрезки, бликов на глянце, освещения.
-ORB + RANSAC ищет устойчивые локальные особенности (углы, текстуры)
-и проверяет, что их взаимное расположение геометрически согласовано
-(гомография) — это работает даже когда фото снято под углом с телефона.
+ВАЖНО про портреты людей: ORB ищет резкие "уголки" и текстуру, а не
+понимает "это лицо" (в отличие от нейросетевых AR-масок вроде TikTok,
+которые натренированы именно на лицах). Гладкая кожа и однотонная
+одежда дают мало зацепок для классического поиска по точкам. Чтобы
+компенсировать это для портретов:
+- увеличено число искомых точек (nfeatures) в разы;
+- добавлено выравнивание контраста (CLAHE) перед поиском точек — это
+  "вытягивает" больше мелких деталей (поры, тени, складки ткани),
+  не видимых алгоритму на плоском изображении;
+- пороги уверенности снижены, т.к. для одного человека в базе риск
+  спутать с чужим фото низкий, а гибкость важнее.
 """
 
 import base64
 import cv2
 import numpy as np
 
-ORB = cv2.ORB_create(nfeatures=800)
+ORB = cv2.ORB_create(nfeatures=2000)
 BF_MATCHER = cv2.BFMatcher(cv2.NORM_HAMMING)
+CLAHE = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
 
-MIN_GOOD_MATCHES = 15
-MIN_INLIERS = 12
+MIN_GOOD_MATCHES = 8
+MIN_INLIERS = 6
+
+
+def _preprocess(img_gray):
+    """Выравнивание контраста — помогает находить точки на гладких лицах/коже."""
+    return CLAHE.apply(img_gray)
 
 
 def compute_descriptors(image_bytes: bytes):
@@ -26,10 +38,11 @@ def compute_descriptors(image_bytes: bytes):
     if img is None:
         return None, None, None
     h, w = img.shape
-    scale = 800 / max(h, w) if max(h, w) > 800 else 1.0
+    scale = 1000 / max(h, w) if max(h, w) > 1000 else 1.0
     if scale != 1.0:
         img = cv2.resize(img, (int(w * scale), int(h * scale)))
 
+    img = _preprocess(img)
     keypoints, descriptors = ORB.detectAndCompute(img, None)
     if descriptors is None:
         return None, None, None
@@ -67,7 +80,7 @@ def match_against_candidates(query_pts, query_desc, candidates: list[dict]):
             continue
 
         matches = BF_MATCHER.knnMatch(query_desc, cand_desc, k=2)
-        good = [m for m, n in matches if m.distance < 0.75 * n.distance]
+        good = [m for m, n in matches if m.distance < 0.8 * n.distance]
         if len(good) < MIN_GOOD_MATCHES:
             continue
 
@@ -75,7 +88,7 @@ def match_against_candidates(query_pts, query_desc, candidates: list[dict]):
         cand_pts_np = np.float32(cand["pts"])
         dst_pts = cand_pts_np[[m.trainIdx for m in good]].reshape(-1, 1, 2)
 
-        _, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+        _, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 8.0)
         if mask is None:
             continue
         inliers = int(mask.sum())
@@ -85,3 +98,4 @@ def match_against_candidates(query_pts, query_desc, candidates: list[dict]):
             best_pair_id = cand["pair_id"]
 
     return best_pair_id
+
