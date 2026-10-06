@@ -28,7 +28,10 @@ export default function AdminPage() {
     e.preventDefault();
     setStatus("Загрузка и анализ фото...");
     try {
-      await uploadPairAdmin({ photoFile, videoFile, clientId: clientId || null, title });
+      await uploadPairAdmin({
+        photoFile, videoFile, clientId: clientId || null, title,
+        onProgress: (msg) => setStatus(msg),
+      });
       setStatus("Готово!");
       setPhotoFile(null);
       setVideoFile(null);
