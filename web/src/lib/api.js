@@ -169,6 +169,17 @@ async function recompileClientTargets(clientId, onProgress) {
 export async function uploadPairAdmin({ photoFile, videoFile, clientId, title, onProgress }) {
   if (onProgress) onProgress("Загружаем файлы...");
 
+  // Если клиент не указан — привязываем пару к самому админу. Это нужно,
+  // чтобы AR-файл распознавания (.mind) вообще пересчитывался: он
+  // пересобирается только для пар, у которых ЕСТЬ client_id. Без этого
+  // тестовые загрузки "без клиента" сохранялись, но никогда не попадали
+  // в сканер — в сканере было бы пусто.
+  let resolvedClientId = clientId || null;
+  if (!resolvedClientId) {
+    const profile = await myProfile();
+    if (profile) resolvedClientId = profile.id;
+  }
+
   const pairId = crypto.randomUUID();
   const photoPath = `${pairId}/${photoFile.name}`;
   const videoPath = `${pairId}/${videoFile.name}`;
@@ -181,15 +192,15 @@ export async function uploadPairAdmin({ photoFile, videoFile, clientId, title, o
 
   const { error: insertErr } = await supabase.from("pairs").insert({
     id: pairId,
-    client_id: clientId || null,
+    client_id: resolvedClientId,
     title: title || null,
     photo_path: photoPath,
     video_path: videoPath,
   });
   if (insertErr) throw new Error("Не удалось сохранить запись: " + insertErr.message);
 
-  if (clientId) {
-    await recompileClientTargets(clientId, onProgress);
+  if (resolvedClientId) {
+    await recompileClientTargets(resolvedClientId, onProgress);
   }
 
   if (onProgress) onProgress("Готово!");
