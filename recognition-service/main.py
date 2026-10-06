@@ -176,7 +176,13 @@ def _serialize_gallery(rows: list[dict]) -> list[dict]:
 @app.get("/gallery/me")
 def gallery_me(authorization: str | None = Header(None)):
     profile = get_profile_from_jwt(authorization)
-    res = supabase.table("pairs").select("*").eq("client_id", profile["id"]).execute()
+    if profile["role"] == "admin":
+        # удобство для тестирования: админ видит и свои тестовые
+        # загрузки без клиента, и всё, что явно привязано ему самому
+        res = supabase.table("pairs").select("*") \
+            .or_(f"client_id.is.null,client_id.eq.{profile['id']}").execute()
+    else:
+        res = supabase.table("pairs").select("*").eq("client_id", profile["id"]).execute()
     return _serialize_gallery(res.data)
 
 
@@ -260,3 +266,4 @@ async def recognize(
 
     matched_row = next(r for r in rows if r["id"] == match_id)
     return {"match": {"pair_id": match_id, "video_url": signed_url("videos", matched_row["video_path"])}}
+
