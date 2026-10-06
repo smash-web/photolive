@@ -3,7 +3,10 @@
 import { supabase } from "../supabaseClient";
 import { compileTargets } from "./mindCompiler";
 
-const BUCKETS = { photos: "photos", videos: "videos", targets: "targets" };
+// ВРЕМЕННЫЙ ТЕСТ: направляем .mind файлы в уже рабочий бакет photos
+// вместо targets, чтобы понять, проблема в конкретном бакете targets
+// или где-то ещё. Вернём обратно после диагностики.
+const BUCKETS = { photos: "photos", videos: "videos", targets: "photos" };
 
 function publicUrl(bucket, path) {
   if (!path) return null;
