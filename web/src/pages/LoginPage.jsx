@@ -13,8 +13,11 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      const fn = mode === "login" ? supabase.auth.signInWithPassword : supabase.auth.signUp;
-      const { data, error } = await fn({ email, password });
+      const { data, error } =
+        mode === "login"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({ email, password });
+
       if (error) {
         setError(error.message);
         return;
