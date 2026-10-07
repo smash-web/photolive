@@ -95,18 +95,24 @@ export async function fetchClientTargets(token) {
   const pairOrder = targetsRow.pair_order || [];
   const { data: pairsData, error: pairsErr } = await supabase
     .from("pairs")
-    .select("id, video_path")
+    .select("id, video_path, photo_path")
     .in("id", pairOrder);
   if (pairsErr) throw new Error("Ошибка загрузки видео: " + pairsErr.message);
 
   const videoByPairId = {};
-  (pairsData || []).forEach((p) => { videoByPairId[p.id] = videoUrl(p.video_path); });
+  const photoByPairId = {};
+  (pairsData || []).forEach((p) => {
+    videoByPairId[p.id] = videoUrl(p.video_path);
+    photoByPairId[p.id] = photoUrl(p.photo_path);
+  });
   const videoUrls = pairOrder.map((id) => videoByPairId[id] || null);
+  const photoUrls = pairOrder.map((id) => photoByPairId[id] || null);
 
   return {
     targetUrl: targetUrl(targetsRow.target_path),
     pairOrder,
     videoUrls,
+    photoUrls,
   };
 }
 
