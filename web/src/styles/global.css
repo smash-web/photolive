@@ -114,6 +114,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 8px;
   gap: 16px;
   padding: 16px 20px;
   max-width: 1040px;
@@ -136,6 +138,7 @@ button {
 .nav-links {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -635,9 +638,21 @@ button {
 @media (max-width: 560px) {
   .topnav-inner {
     padding: 14px 16px;
+    justify-content: center;
+    text-align: center;
+  }
+  .brand {
+    width: 100%;
+    text-align: center;
+    font-size: 18px;
+  }
+  .nav-links {
+    width: 100%;
+    justify-content: center;
+    gap: 2px;
   }
   .nav-link {
-    padding: 8px 9px;
+    padding: 7px 8px;
     font-size: 13px;
   }
   .page {
