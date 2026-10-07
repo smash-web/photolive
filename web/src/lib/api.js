@@ -168,7 +168,7 @@ async function recompileClientTargets(clientId, onProgress) {
   // хранилище не успело подтвердить удаление (гонка) и загрузка
   // падает с "already exists" — делаем одну повторную попытку
   // чуть позже.
-  await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
+  const { error: removeErr } = await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
 
   const doUpload = () =>
     supabase.storage
@@ -178,10 +178,15 @@ async function recompileClientTargets(clientId, onProgress) {
   let { error: uploadErr } = await doUpload();
   if (uploadErr && String(uploadErr.message || "").includes("already exists")) {
     await new Promise((resolve) => setTimeout(resolve, 500));
-    await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
+    const { error: removeErr2 } = await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
     ({ error: uploadErr } = await doUpload());
-  }
-  if (uploadErr) {
+    if (uploadErr) {
+      throw new Error(
+        "Не удалось загрузить .mind файл: " + uploadErr.message +
+        " | удаление старого файла: " + (removeErr?.message || removeErr2?.message || "без ошибки, но файл не делся")
+      );
+    }
+  } else if (uploadErr) {
     throw new Error("Не удалось загрузить .mind файл: " + uploadErr.message);
   }
 
