@@ -33,6 +33,7 @@ export default function AdminPage() {
       const res = await createClientAdmin(newClientName);
       setNewClientLink(res);
       setClientId(res.client_id);
+      setNewClientName("");
     } catch (e) {
       setError(e.message);
     }
@@ -78,70 +79,86 @@ export default function AdminPage() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 720 }}>
-      <h2>Админ-панель</h2>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      <section style={{ marginBottom: 24, padding: 16, border: "1px solid #eee", borderRadius: 8 }}>
-        <h3>Создать клиента</h3>
-        <form onSubmit={handleCreateClient} style={{ display: "flex", gap: 8 }}>
-          <input
-            placeholder="Имя клиента"
-            value={newClientName}
-            onChange={(e) => setNewClientName(e.target.value)}
-          />
-          <button type="submit">Создать и получить ссылку</button>
-        </form>
-        {newClientLink && (
-          <div style={{ marginTop: 8, fontSize: 13 }}>
-            <p>Ссылка на галерею клиента: <code>{window.location.origin}{newClientLink.gallery_link}</code></p>
-            <p>ID клиента (уже вставлен в форму загрузки ниже):</p>
-            <code style={{ userSelect: "all", display: "block", padding: 4, background: "#f5f5f5" }}>
-              {newClientLink.client_id}
-            </code>
-          </div>
-        )}
-      </section>
-
-      <section style={{ marginBottom: 24, padding: 16, border: "1px solid #eee", borderRadius: 8 }}>
-        <h3>Загрузить фото + видео</h3>
-        <form onSubmit={handleUpload} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label>
-            Фото:{" "}
-            <input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files[0])} />
-          </label>
-          <label>
-            Видео:{" "}
-            <input type="file" accept="video/*" onChange={(e) => setVideoFile(e.target.files[0])} />
-          </label>
-          <input
-            placeholder="Название (необязательно)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <input
-            placeholder="ID клиента (необязательно — оставьте пустым для тестовой загрузки без привязки)"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-          />
-          <button type="submit" disabled={busy}>{busy ? "Загрузка..." : "Загрузить"}</button>
-          {status && <p style={{ fontSize: 13, color: "#555" }}>{status}</p>}
-        </form>
-      </section>
-
-      <section>
-        <h3>Все пары ({pairs.length})</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-          {pairs.map((p) => (
-            <div key={p.id} style={{ width: 200, border: "1px solid #ddd", borderRadius: 8, padding: 8 }}>
-              <img src={p.photo_url} alt={p.title || ""} style={{ width: "100%", height: 160, objectFit: "cover", borderRadius: 4 }} />
-              <p style={{ fontSize: 12, margin: "6px 0" }}>{p.title || "(без названия)"}</p>
-              <p style={{ fontSize: 11, color: "#888" }}>{p.client_id ? "Клиент: " + p.client_id.slice(0, 8) + "…" : "Без клиента"}</p>
-              <button onClick={() => handleDelete(p.id)} style={{ color: "red", width: "100%" }}>Удалить</button>
-            </div>
-          ))}
+    <div className="page">
+      <div className="container">
+        <div className="page-head">
+          <h1>Админка</h1>
         </div>
-      </section>
+
+        {error && <div className="alert alert-error">{error}</div>}
+
+        <div className="admin-grid">
+          <div className="admin-card">
+            <h2>Создать клиента</h2>
+            <form onSubmit={handleCreateClient} className="inline-form">
+              <input
+                className="input"
+                placeholder="Имя клиента"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+              />
+              <button type="submit" className="btn btn-primary">Создать</button>
+            </form>
+            {newClientLink && (
+              <div className="link-result">
+                <div>Ссылка на галерею клиента:</div>
+                <code className="code-chip">{window.location.origin}{newClientLink.gallery_link}</code>
+                <div style={{ marginTop: 10 }}>ID клиента (уже подставлен ниже в форму загрузки):</div>
+                <code className="code-chip">{newClientLink.client_id}</code>
+              </div>
+            )}
+          </div>
+
+          <div className="admin-card">
+            <h2>Загрузить фото + видео</h2>
+            <form onSubmit={handleUpload}>
+              <div className="field">
+                <label>Фото</label>
+                <input className="file-input" type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files[0])} />
+              </div>
+              <div className="field">
+                <label>Видео</label>
+                <input className="file-input" type="file" accept="video/*" onChange={(e) => setVideoFile(e.target.files[0])} />
+              </div>
+              <div className="field">
+                <label>Название (необязательно)</label>
+                <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
+              </div>
+              <div className="field" style={{ marginBottom: 20 }}>
+                <label>ID клиента</label>
+                <input
+                  className="input"
+                  placeholder="оставьте пустым для тестовой загрузки"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
+                {busy ? "Загрузка…" : "Загрузить"}
+              </button>
+              {status && <p className="status-line">{status}</p>}
+            </form>
+          </div>
+
+          <div className="admin-card admin-card-wide">
+            <h2>Все пары ({pairs.length})</h2>
+            <div className="admin-pairs-grid">
+              {pairs.map((p) => (
+                <div key={p.id} className="admin-pair-card">
+                  <img className="admin-pair-thumb" src={p.photo_url} alt={p.title || ""} />
+                  <div className="admin-pair-meta">
+                    <div className="admin-pair-title">{p.title || "Без названия"}</div>
+                    <div className="admin-pair-client">
+                      {p.client_id ? "Клиент: " + p.client_id.slice(0, 8) + "…" : "Без клиента"}
+                    </div>
+                    <button className="btn-danger-text" onClick={() => handleDelete(p.id)}>Удалить</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -25,18 +25,34 @@ export default function ClientGalleryPage() {
   }, [token]);
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Моя галерея</h2>
-      <p>
-        <Link to={token ? `/scan/${token}` : "/scan"}>Открыть AR-сканер →</Link>
-      </p>
-      {loading && <p>Загрузка...</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      {!loading && !error && pairs.length === 0 && <p>Пока нет фото.</p>}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-        {pairs.map((p) => (
-          <HoverPlayPhoto key={p.id} photoUrl={p.photo_url} videoUrl={p.video_url} title={p.title} />
-        ))}
+    <div className="page">
+      <div className="container">
+        <div className="page-head">
+          <h1>Моя галерея</h1>
+          <Link to={token ? `/scan/${token}` : "/scan"} className="scan-cta">
+            Открыть AR-сканер →
+          </Link>
+        </div>
+
+        {!loading && !error && pairs.length > 0 && (
+          <p className="helper-text" style={{ marginTop: -16 }}>
+            Наведите курсор на фото (на телефоне — коснитесь), чтобы оно ожило.
+          </p>
+        )}
+
+        {loading && <p>Загрузка…</p>}
+        {error && <div className="alert alert-error">{error}</div>}
+        {!loading && !error && pairs.length === 0 && (
+          <div className="empty-state">
+            <p style={{ margin: 0 }}>Здесь пока нет фотографий. Как только их добавят, они появятся в этой галерее.</p>
+          </div>
+        )}
+
+        <div className="gallery-grid">
+          {pairs.map((p) => (
+            <HoverPlayPhoto key={p.id} photoUrl={p.photo_url} videoUrl={p.video_url} title={p.title} />
+          ))}
+        </div>
       </div>
     </div>
   );

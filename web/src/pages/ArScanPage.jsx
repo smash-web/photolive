@@ -118,60 +118,18 @@ export default function ArScanPage() {
   }, [token]);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        width: "100vw",
-        height: "100vh",
-        zIndex: 1000,
-      }}
-    >
+    <div className="scan-shell">
       <div ref={containerRef} style={{ position: "relative", zIndex: 0, width: "100%", height: "100%" }} />
 
-      <button
-        onClick={() => navigate("/")}
-        style={{
-          position: "absolute",
-          top: 16,
-          right: 16,
-          zIndex: 1001,
-          width: 44,
-          height: 44,
-          borderRadius: "50%",
-          border: "none",
-          background: "rgba(0,0,0,0.6)",
-          color: "#fff",
-          fontSize: 22,
-          lineHeight: "44px",
-          textAlign: "center",
-          padding: 0,
-        }}
-        aria-label="Закрыть сканер"
-      >
+      <button onClick={() => navigate("/")} className="scan-close" aria-label="Закрыть сканер">
         ✕
       </button>
 
-      <p style={{ position: "absolute", bottom: 16, left: 0, right: 0, zIndex: 1001, textAlign: "center", color: "#fff" }}>
-        {status}
-      </p>
-      {error && (
-        <div
-          style={{
-            position: "absolute",
-            top: 16,
-            left: 16,
-            right: 70,
-            zIndex: 1001,
-            color: "#fff",
-            background: "rgba(200,0,0,0.7)",
-            padding: 8,
-            borderRadius: 8,
-          }}
-        >
-          {error}
-        </div>
-      )}
+      <div className="scan-status">
+        <span className="scan-status-pill">{status}</span>
+      </div>
+
+      {error && <div className="scan-error">{error}</div>}
     </div>
   );
 }
