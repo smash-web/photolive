@@ -134,41 +134,36 @@ export async function createClientAdmin(displayName) {
   return { client_id: data.id, access_token: token, gallery_link: `/gallery/${token}` };
 }
 
-// Загружает .mind-файл в Storage, пробуя несколько способов подряд —
-// на практике upsert и remove()+upload() у Storage API иногда
-// по-разному спорят с RLS (и сам remove() иногда "успешно" ничего
-// не удаляет), поэтому пробуем по очереди, а не полагаемся на один
-// способ:
-//   1) upload с upsert: true — атомарно, через ON CONFLICT в Postgres,
-//      не зависит от отдельного remove().
-//   2) если это не сработало — явный remove() + обычный upload().
-//   3) если и это не сработало — пауза и ещё одна попытка remove()+upload()
-//      (на случай гонки, когда Storage не успел подтвердить удаление).
-async function uploadTargetFile(targetPath, buffer) {
-  const blob = new Blob([buffer]);
-  const opts = { contentType: "application/octet-stream" };
+// Загружает .mind-файл в Storage ПОД НОВЫМ УНИКАЛЬНЫМ ИМЕНЕМ каждый
+// раз (а не перезаписывает старый файл с тем же именем). Так мы
+// полностью уходим от конфликтов "уже существует" и путаницы с тем,
+// кто именно (клиент или админ) владеет файлом — перезаписи попросту
+// никогда не происходит. Старые файлы этого клиента подчищаются
+// отдельно, best-effort (см. ниже) — если подчистка не удастся, это
+// не страшно, просто останется немного неиспользуемых файлов.
+async function uploadTargetFile(clientId, buffer) {
+  const uniqueName = `targets-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mind`;
+  const targetPath = `${clientId}/${uniqueName}`;
 
-  let { error: err1 } = await supabase.storage
+  const { error } = await supabase.storage
     .from(BUCKETS.targets)
-    .upload(targetPath, blob, { ...opts, upsert: true });
-  if (!err1) return;
+    .upload(targetPath, new Blob([buffer]), { contentType: "application/octet-stream" });
+  if (error) throw new Error("Не удалось загрузить .mind файл: " + error.message);
 
-  const { error: removeErr1 } = await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
-  let { error: err2 } = await supabase.storage.from(BUCKETS.targets).upload(targetPath, blob, opts);
-  if (!err2) return;
+  // Подчищаем старые файлы этого клиента в фоне — ошибки тут
+  // намеренно игнорируются, это не должно ломать основную операцию.
+  try {
+    const { data: files } = await supabase.storage.from(BUCKETS.targets).list(clientId);
+    const toDelete = (files || [])
+      .map((f) => f.name)
+      .filter((name) => name !== uniqueName && name.endsWith(".mind"))
+      .map((name) => `${clientId}/${name}`);
+    if (toDelete.length) await supabase.storage.from(BUCKETS.targets).remove(toDelete);
+  } catch {
+    // best-effort, игнорируем
+  }
 
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  const { error: removeErr2 } = await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
-  let { error: err3 } = await supabase.storage.from(BUCKETS.targets).upload(targetPath, blob, opts);
-  if (!err3) return;
-
-  throw new Error(
-    "Не удалось загрузить .mind файл после трёх попыток: " +
-      [err1?.message, err2?.message, err3?.message].filter(Boolean).join(" | ") +
-      " (удаление старого файла: " +
-      (removeErr1?.message || removeErr2?.message || "без ошибки, но файл не делся") +
-      ")"
-  );
+  return targetPath;
 }
 
 // Пересобирает ВЕСЬ .mind-файл клиента из всех его текущих фото —
@@ -197,8 +192,7 @@ async function recompileClientTargets(clientId, onProgress) {
     if (onProgress) onProgress(`Компилируем AR-цели: ${Math.round(progress)}%`);
   });
 
-  const targetPath = `${clientId}/targets.mind`;
-  await uploadTargetFile(targetPath, buffer);
+  const targetPath = await uploadTargetFile(clientId, buffer);
 
   const pairOrder = pairs.map((p) => p.id);
   const { error: upsertErr } = await supabase
@@ -297,7 +291,16 @@ export async function adminDeleteProfile(profileId) {
   const videoPaths = (pairs || []).map((p) => p.video_path).filter(Boolean);
   if (photoPaths.length) await supabase.storage.from(BUCKETS.photos).remove(photoPaths);
   if (videoPaths.length) await supabase.storage.from(BUCKETS.videos).remove(videoPaths);
-  await supabase.storage.from(BUCKETS.targets).remove([`${profileId}/targets.mind`]);
+
+  // Имена .mind-файлов теперь уникальные (targets-<время>-<случайное>.mind),
+  // поэтому удаляем все файлы в папке клиента, а не одно фиксированное имя.
+  try {
+    const { data: targetFiles } = await supabase.storage.from(BUCKETS.targets).list(profileId);
+    const targetPaths = (targetFiles || []).map((f) => `${profileId}/${f.name}`);
+    if (targetPaths.length) await supabase.storage.from(BUCKETS.targets).remove(targetPaths);
+  } catch {
+    // best-effort, игнорируем
+  }
 
   await supabase.from("client_targets").delete().eq("client_id", profileId);
   await supabase.from("pairs").delete().eq("client_id", profileId);
