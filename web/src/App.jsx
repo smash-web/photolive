@@ -6,8 +6,10 @@ import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import UploadPage from "./pages/UploadPage";
+import ProfilePage from "./pages/ProfilePage";
 import ClientGalleryPage from "./pages/ClientGalleryPage";
 import ArScanPage from "./pages/ArScanPage";
+import BottomNav from "./components/BottomNav";
 
 function useProfile() {
   const [profile, setProfile] = useState(undefined); // undefined = ещё грузится, null = не вошёл
@@ -61,7 +63,7 @@ export default function App() {
             </Link>
             <nav className="nav-links">
               {profile && (
-                <>
+                <span className="nav-links-desktop">
                   <Link to="/gallery" className="nav-link">Моя галерея</Link>
                   <Link to="/scan" className="nav-link">Сканер (AR)</Link>
                   {profile.role === "admin" ? (
@@ -72,15 +74,13 @@ export default function App() {
                   ) : (
                     <Link to="/upload" className="nav-link">Загрузить</Link>
                   )}
-                </>
+                  <button onClick={handleLogout} className="nav-link" style={{ background: "none", border: "none", cursor: "pointer" }}>
+                    Выйти
+                  </button>
+                </span>
               )}
               {profile === null && (
                 <Link to="/login" className="nav-link nav-cta">Войти</Link>
-              )}
-              {profile && (
-                <button onClick={handleLogout} className="nav-link" style={{ background: "none", border: "none", cursor: "pointer" }}>
-                  Выйти
-                </button>
               )}
             </nav>
           </div>
@@ -112,12 +112,21 @@ export default function App() {
             </RequireAuth>
           }
         />
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth profile={profile}>
+              <ProfilePage profile={profile} />
+            </RequireAuth>
+          }
+        />
         <Route path="/gallery" element={<ClientGalleryPage />} />
         <Route path="/gallery/:token" element={<ClientGalleryPage />} />
         <Route path="/scan" element={<ArScanPage />} />
         <Route path="/scan/:token" element={<ArScanPage />} />
         <Route path="/" element={<LoginPage />} />
       </Routes>
+      {!isScanRoute && <BottomNav profile={profile} />}
     </>
   );
 }
