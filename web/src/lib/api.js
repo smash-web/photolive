@@ -134,6 +134,43 @@ export async function createClientAdmin(displayName) {
   return { client_id: data.id, access_token: token, gallery_link: `/gallery/${token}` };
 }
 
+// Загружает .mind-файл в Storage, пробуя несколько способов подряд —
+// на практике upsert и remove()+upload() у Storage API иногда
+// по-разному спорят с RLS (и сам remove() иногда "успешно" ничего
+// не удаляет), поэтому пробуем по очереди, а не полагаемся на один
+// способ:
+//   1) upload с upsert: true — атомарно, через ON CONFLICT в Postgres,
+//      не зависит от отдельного remove().
+//   2) если это не сработало — явный remove() + обычный upload().
+//   3) если и это не сработало — пауза и ещё одна попытка remove()+upload()
+//      (на случай гонки, когда Storage не успел подтвердить удаление).
+async function uploadTargetFile(targetPath, buffer) {
+  const blob = new Blob([buffer]);
+  const opts = { contentType: "application/octet-stream" };
+
+  let { error: err1 } = await supabase.storage
+    .from(BUCKETS.targets)
+    .upload(targetPath, blob, { ...opts, upsert: true });
+  if (!err1) return;
+
+  const { error: removeErr1 } = await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
+  let { error: err2 } = await supabase.storage.from(BUCKETS.targets).upload(targetPath, blob, opts);
+  if (!err2) return;
+
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  const { error: removeErr2 } = await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
+  let { error: err3 } = await supabase.storage.from(BUCKETS.targets).upload(targetPath, blob, opts);
+  if (!err3) return;
+
+  throw new Error(
+    "Не удалось загрузить .mind файл после трёх попыток: " +
+      [err1?.message, err2?.message, err3?.message].filter(Boolean).join(" | ") +
+      " (удаление старого файла: " +
+      (removeErr1?.message || removeErr2?.message || "без ошибки, но файл не делся") +
+      ")"
+  );
+}
+
 // Пересобирает ВЕСЬ .mind-файл клиента из всех его текущих фото —
 // MindAR хранит несколько целей распознавания в одном файле, поэтому
 // при любом изменении набора (добавили/удалили фото) файл нужно
@@ -161,34 +198,7 @@ async function recompileClientTargets(clientId, onProgress) {
   });
 
   const targetPath = `${clientId}/targets.mind`;
-
-  // upsert здесь ненадёжен (видимо, отдельная проверка "уже
-  // существует?" у Storage API не всегда корректно проходит RLS) —
-  // поэтому сначала удаляем старый файл, затем грузим новый. Если
-  // хранилище не успело подтвердить удаление (гонка) и загрузка
-  // падает с "already exists" — делаем одну повторную попытку
-  // чуть позже.
-  const { error: removeErr } = await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
-
-  const doUpload = () =>
-    supabase.storage
-      .from(BUCKETS.targets)
-      .upload(targetPath, new Blob([buffer]), { contentType: "application/octet-stream" });
-
-  let { error: uploadErr } = await doUpload();
-  if (uploadErr && String(uploadErr.message || "").includes("already exists")) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const { error: removeErr2 } = await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
-    ({ error: uploadErr } = await doUpload());
-    if (uploadErr) {
-      throw new Error(
-        "Не удалось загрузить .mind файл: " + uploadErr.message +
-        " | удаление старого файла: " + (removeErr?.message || removeErr2?.message || "без ошибки, но файл не делся")
-      );
-    }
-  } else if (uploadErr) {
-    throw new Error("Не удалось загрузить .mind файл: " + uploadErr.message);
-  }
+  await uploadTargetFile(targetPath, buffer);
 
   const pairOrder = pairs.map((p) => p.id);
   const { error: upsertErr } = await supabase
