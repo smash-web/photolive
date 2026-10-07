@@ -355,6 +355,65 @@ button {
   color: var(--ink-soft);
 }
 
+.howto-card {
+  background: var(--paper-raised);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-print);
+  padding: 32px 28px;
+}
+
+.howto-card h2 {
+  font-size: 19px;
+  margin-bottom: 4px;
+}
+
+.howto-card > p {
+  color: var(--ink-soft);
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+
+.howto-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.howto-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.howto-step-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--safelight);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.howto-step-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.howto-step-text {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+@media (max-width: 680px) {
+  .howto-steps {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
 .photo-card {
   background: var(--paper-raised);
   border-radius: var(--radius-sm);
@@ -407,6 +466,36 @@ button {
 
 .photo-card.is-playing .photo-card-frame {
   box-shadow: inset 0 0 0 2px var(--gold), 0 0 24px -2px var(--gold);
+}
+
+.photo-card-share {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(23, 21, 17, 0.45);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.photo-card:hover .photo-card-share,
+.photo-card.is-playing .photo-card-share {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .photo-card-share {
+    opacity: 1;
+  }
 }
 
 .photo-card-caption {
