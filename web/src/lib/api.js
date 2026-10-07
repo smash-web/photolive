@@ -162,14 +162,25 @@ async function recompileClientTargets(clientId, onProgress) {
 
   const targetPath = `${clientId}/targets.mind`;
 
-  // upsert: true — перезаписываем файл, если он уже есть (при повторной
-  // загрузке фото для того же клиента). Права на запись/перезапись
-  // теперь корректно настроены (см. migration_self_upload_and_users.sql),
-  // поэтому отдельное предварительное удаление файла больше не нужно —
-  // оно только создавало гонку между удалением и новой загрузкой.
-  const { error: uploadErr } = await supabase.storage
-    .from(BUCKETS.targets)
-    .upload(targetPath, new Blob([buffer]), { contentType: "application/octet-stream", upsert: true });
+  // upsert здесь ненадёжен (видимо, отдельная проверка "уже
+  // существует?" у Storage API не всегда корректно проходит RLS) —
+  // поэтому сначала удаляем старый файл, затем грузим новый. Если
+  // хранилище не успело подтвердить удаление (гонка) и загрузка
+  // падает с "already exists" — делаем одну повторную попытку
+  // чуть позже.
+  await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
+
+  const doUpload = () =>
+    supabase.storage
+      .from(BUCKETS.targets)
+      .upload(targetPath, new Blob([buffer]), { contentType: "application/octet-stream" });
+
+  let { error: uploadErr } = await doUpload();
+  if (uploadErr && String(uploadErr.message || "").includes("already exists")) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
+    ({ error: uploadErr } = await doUpload());
+  }
   if (uploadErr) {
     throw new Error("Не удалось загрузить .mind файл: " + uploadErr.message);
   }
