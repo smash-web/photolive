@@ -1,5 +1,6 @@
 // Весь доступ к данным идёт напрямую в Supabase (без Python-бэкенда).
-// Права разграничены через RLS-политики в базе (см. supabase/schema.sql).
+// Права разграничены через RLS-политики в базе (см. supabase/schema.sql
+// и supabase/migration_self_upload_and_users.sql).
 import { supabase } from "../supabaseClient";
 import { compileTargets } from "./mindCompiler";
 
@@ -180,23 +181,25 @@ async function recompileClientTargets(clientId, onProgress) {
   if (upsertErr) throw new Error("Не удалось сохранить данные распознавания: " + upsertErr.message);
 }
 
-export async function uploadPairAdmin({ photoFile, videoFile, clientId, title, onProgress }) {
+// Загружает пару фото+видео. Без clientId — грузит на СВОЙ профиль
+// (так пользуются и обычные пользователи со страницы "Загрузить",
+// и админ при тестовой загрузке). С clientId — админ привязывает
+// пару конкретному клиенту.
+export async function uploadPair({ photoFile, videoFile, clientId, title, onProgress }) {
   if (onProgress) onProgress("Загружаем файлы...");
 
-  // Если клиент не указан — привязываем пару к самому админу. Это нужно,
-  // чтобы AR-файл распознавания (.mind) вообще пересчитывался: он
-  // пересобирается только для пар, у которых ЕСТЬ client_id. Без этого
-  // тестовые загрузки "без клиента" сохранялись, но никогда не попадали
-  // в сканер — в сканере было бы пусто.
   let resolvedClientId = clientId || null;
   if (!resolvedClientId) {
     const profile = await myProfile();
-    if (profile) resolvedClientId = profile.id;
+    if (!profile) throw new Error("Не удалось определить ваш профиль");
+    resolvedClientId = profile.id;
   }
 
   const pairId = crypto.randomUUID();
-  const photoPath = `${pairId}/${photoFile.name}`;
-  const videoPath = `${pairId}/${videoFile.name}`;
+  // Путь начинается с ID владельца — так Storage может проверить,
+  // что пользователь пишет только в свою папку (см. RLS-политики).
+  const photoPath = `${resolvedClientId}/${pairId}/${photoFile.name}`;
+  const videoPath = `${resolvedClientId}/${pairId}/${videoFile.name}`;
 
   const { error: photoErr } = await supabase.storage.from(BUCKETS.photos).upload(photoPath, photoFile);
   if (photoErr) throw new Error("Не удалось загрузить фото: " + photoErr.message);
@@ -213,15 +216,13 @@ export async function uploadPairAdmin({ photoFile, videoFile, clientId, title, o
   });
   if (insertErr) throw new Error("Не удалось сохранить запись: " + insertErr.message);
 
-  if (resolvedClientId) {
-    await recompileClientTargets(resolvedClientId, onProgress);
-  }
+  await recompileClientTargets(resolvedClientId, onProgress);
 
   if (onProgress) onProgress("Готово!");
   return { pair_id: pairId };
 }
 
-export async function deletePairAdmin(pairId) {
+export async function deletePair(pairId) {
   const { data: row, error: fetchErr } = await supabase
     .from("pairs")
     .select("photo_path, video_path, client_id")
@@ -239,4 +240,42 @@ export async function deletePairAdmin(pairId) {
   }
 
   return { deleted: pairId };
+}
+
+// ---------- админ: пользователи и сгенерированные ссылки ----------
+
+export async function adminListProfiles() {
+  const { data, error } = await supabase.rpc("admin_list_profiles");
+  if (error) throw new Error("Не удалось получить список пользователей: " + error.message);
+  return data || [];
+}
+
+// Удаляет профиль (зарегистрированного пользователя или клиента по
+// ссылке) вместе со всеми его фото/видео и AR-данными.
+//
+// Важно: это не удаляет сам логин (email/пароль) из Supabase Auth —
+// браузерное приложение без собственного сервера не имеет доступа к
+// Admin API, который только и может это сделать. Удаление профиля
+// полностью забирает доступ к приложению и все данные пользователя;
+// если он когда-нибудь попробует войти снова, для него просто не
+// будет профиля (это безопасно, но не то же самое, что стереть сам
+// аккаунт входа).
+export async function adminDeleteProfile(profileId) {
+  const { data: pairs, error: pairsErr } = await supabase
+    .from("pairs")
+    .select("photo_path, video_path")
+    .eq("client_id", profileId);
+  if (pairsErr) throw new Error("Не удалось получить фото пользователя: " + pairsErr.message);
+
+  const photoPaths = (pairs || []).map((p) => p.photo_path).filter(Boolean);
+  const videoPaths = (pairs || []).map((p) => p.video_path).filter(Boolean);
+  if (photoPaths.length) await supabase.storage.from(BUCKETS.photos).remove(photoPaths);
+  if (videoPaths.length) await supabase.storage.from(BUCKETS.videos).remove(videoPaths);
+  await supabase.storage.from(BUCKETS.targets).remove([`${profileId}/targets.mind`]);
+
+  await supabase.from("client_targets").delete().eq("client_id", profileId);
+  await supabase.from("pairs").delete().eq("client_id", profileId);
+
+  const { error: delErr } = await supabase.from("profiles").delete().eq("id", profileId);
+  if (delErr) throw new Error("Не удалось удалить пользователя: " + delErr.message);
 }

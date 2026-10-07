@@ -4,6 +4,8 @@ import { supabase } from "./supabaseClient";
 import { myProfile } from "./lib/api";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
+import AdminUsersPage from "./pages/AdminUsersPage";
+import UploadPage from "./pages/UploadPage";
 import ClientGalleryPage from "./pages/ClientGalleryPage";
 import ArScanPage from "./pages/ArScanPage";
 
@@ -33,6 +35,12 @@ function RequireAdmin({ profile, children }) {
   return children;
 }
 
+function RequireAuth({ profile, children }) {
+  if (profile === undefined) return null;
+  if (!profile) return <Navigate to="/login" replace />;
+  return children;
+}
+
 export default function App() {
   const profile = useProfile();
   const location = useLocation();
@@ -56,10 +64,15 @@ export default function App() {
                 <>
                   <Link to="/gallery" className="nav-link">Моя галерея</Link>
                   <Link to="/scan" className="nav-link">Сканер (AR)</Link>
+                  {profile.role === "admin" ? (
+                    <>
+                      <Link to="/admin" className="nav-link">Админка</Link>
+                      <Link to="/admin/users" className="nav-link">Пользователи</Link>
+                    </>
+                  ) : (
+                    <Link to="/upload" className="nav-link">Загрузить</Link>
+                  )}
                 </>
-              )}
-              {profile?.role === "admin" && (
-                <Link to="/admin" className="nav-link">Админка</Link>
               )}
               {profile === null && (
                 <Link to="/login" className="nav-link nav-cta">Войти</Link>
@@ -81,6 +94,22 @@ export default function App() {
             <RequireAdmin profile={profile}>
               <AdminPage />
             </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <RequireAdmin profile={profile}>
+              <AdminUsersPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/upload"
+          element={
+            <RequireAuth profile={profile}>
+              <UploadPage />
+            </RequireAuth>
           }
         />
         <Route path="/gallery" element={<ClientGalleryPage />} />

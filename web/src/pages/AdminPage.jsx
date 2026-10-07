@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { listAllPairsAdmin, createClientAdmin, uploadPairAdmin, deletePairAdmin } from "../lib/api";
+import { Link } from "react-router-dom";
+import { listAllPairsAdmin, createClientAdmin, uploadPair, deletePair } from "../lib/api";
 
 export default function AdminPage() {
   const [pairs, setPairs] = useState([]);
@@ -48,7 +49,7 @@ export default function AdminPage() {
     setError(null);
     setBusy(true);
     try {
-      await uploadPairAdmin({
+      await uploadPair({
         photoFile,
         videoFile,
         clientId: clientId || null,
@@ -71,7 +72,7 @@ export default function AdminPage() {
     if (!window.confirm("Удалить эту пару фото+видео?")) return;
     setError(null);
     try {
-      await deletePairAdmin(pairId);
+      await deletePair(pairId);
       await reload();
     } catch (e) {
       setError(e.message);
@@ -83,6 +84,7 @@ export default function AdminPage() {
       <div className="container">
         <div className="page-head">
           <h1>Админка</h1>
+          <Link to="/admin/users" className="scan-cta">Пользователи и ссылки →</Link>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
