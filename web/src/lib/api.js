@@ -162,14 +162,14 @@ async function recompileClientTargets(clientId, onProgress) {
 
   const targetPath = `${clientId}/targets.mind`;
 
-  // Загружаем .mind файл заново: сначала удаляем старый (если есть),
-  // затем простой upload без upsert — именно upsert вызывал 403 при
-  // проверке существования файла.
-  await supabase.storage.from(BUCKETS.targets).remove([targetPath]);
-
+  // upsert: true — перезаписываем файл, если он уже есть (при повторной
+  // загрузке фото для того же клиента). Права на запись/перезапись
+  // теперь корректно настроены (см. migration_self_upload_and_users.sql),
+  // поэтому отдельное предварительное удаление файла больше не нужно —
+  // оно только создавало гонку между удалением и новой загрузкой.
   const { error: uploadErr } = await supabase.storage
     .from(BUCKETS.targets)
-    .upload(targetPath, new Blob([buffer]), { contentType: "application/octet-stream" });
+    .upload(targetPath, new Blob([buffer]), { contentType: "application/octet-stream", upsert: true });
   if (uploadErr) {
     throw new Error("Не удалось загрузить .mind файл: " + uploadErr.message);
   }
