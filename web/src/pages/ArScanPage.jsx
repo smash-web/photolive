@@ -91,8 +91,8 @@ export default function ArScanPage() {
   }, [token]);
 
   return (
-    <div style={{ position: "relative", width: "100vw", height: "100vh", background: "#000" }}>
-      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+    <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
+      <div ref={containerRef} style={{ position: "relative", zIndex: 0, width: "100%", height: "100%" }} />
       <p style={{ position: "absolute", bottom: 16, left: 0, right: 0, textAlign: "center", color: "#fff" }}>
         {status}
       </p>
